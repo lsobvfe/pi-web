@@ -8,10 +8,18 @@ import {
   resolveDirectory,
   shouldShowWindowsDrivePicker,
 } from "@/lib/directory-browser";
+import { isManagedMode, managedWorkspaceRoot } from "@/lib/managed-mode";
 
 // GET /api/cwd/browse?path=...：列出文件系统中的可读子目录。
 export async function GET(request: NextRequest) {
   try {
+    if (isManagedMode()) {
+      return NextResponse.json({
+        path: managedWorkspaceRoot(),
+        parentPath: null,
+        directories: [],
+      });
+    }
     const requested = request.nextUrl.searchParams.get("path")?.trim();
 
     if (shouldShowWindowsDrivePicker(requested)) {

@@ -40,7 +40,7 @@
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.84.2",
     "@earendil-works/pi-ai": "0.84.2",
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "file:../pi/packages/coding-agent",
     "@earendil-works/pi-tui": "0.84.2",
     "js-yaml": "^5.2.3",
     "next": "16.3.1",

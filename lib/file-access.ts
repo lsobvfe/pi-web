@@ -2,6 +2,7 @@ import { readdirSync } from "fs";
 import { homedir } from "os";
 import path from "path";
 import { getAdditionalAllowedRoots, normalizeSlashes } from "./allowed-roots";
+import { isManagedMode, managedWorkspaceRoot } from "./managed-mode";
 import { isExistingPathWithinRoots, isPathWithinRoots } from "./path-security";
 import { listAllSessions } from "./session-reader";
 export { allowFileRoot, normalizeSlashes } from "./allowed-roots";
@@ -18,6 +19,9 @@ declare global {
 const ALLOWED_ROOTS_TTL_MS = 5_000;
 
 export async function getAllowedFileRoots(): Promise<Set<string>> {
+  if (isManagedMode()) {
+    return new Set([normalizeSlashes(managedWorkspaceRoot())]);
+  }
   const now = Date.now();
   const cached = globalThis.__piAllowedRootsCache;
   if (cached && cached.expiresAt > now) return cached.roots;

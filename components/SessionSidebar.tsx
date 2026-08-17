@@ -136,6 +136,12 @@ interface ValidatedProject {
   key: string;
 }
 
+interface RuntimeMode {
+  managed: boolean;
+  directorySelectionEnabled: boolean;
+  workspaceRoot: string | null;
+}
+
 const UNREAD_SESSIONS_STORAGE_KEY = "pi-web:unread-session-ids";
 const RUNNING_SESSIONS_POLL_MS = 2500;
 
@@ -406,6 +412,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [customPathValue, setCustomPathValue] = useState("");
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode | null>(null);
+  const [runtimeModeError, setRuntimeModeError] = useState<string | null>(null);
   const [validatedProject, setValidatedProject] = useState<ValidatedProject | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   // Worktree switcher state
@@ -429,6 +437,42 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/runtime/mode")
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<RuntimeMode>;
+      })
+      .then((value) => {
+        if (cancelled) return;
+        if (
+          typeof value.managed !== "boolean"
+          || typeof value.directorySelectionEnabled !== "boolean"
+          || (value.workspaceRoot !== null && typeof value.workspaceRoot !== "string")
+        ) {
+          throw new Error("PI_WEB_RUNTIME_MODE_INVALID");
+        }
+        if (value.managed && !value.workspaceRoot) {
+          throw new Error("PI_WEB_MANAGED_WORKSPACE_REQUIRED");
+        }
+        setRuntimeModeError(null);
+        setRuntimeMode(value);
+        if (value.managed && value.workspaceRoot) {
+          setSelectedCwd(value.workspaceRoot);
+          setDropdownOpen(false);
+          setCustomPathOpen(false);
+        }
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setRuntimeModeError(cause instanceof Error ? cause.message : String(cause));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Once polling has delivered a snapshot it is the source of truth for
   // running state; late /api/sessions responses must not overwrite it.
   const runningPollAuthoritativeRef = useRef(false);
@@ -924,6 +968,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     ? sessionsForProject(allSessions, selectedProject.key)
     : allSessions;
   const showWorktreeSwitcher = Boolean(
+    runtimeMode?.directorySelectionEnabled
+    &&
     worktreeState?.isGit
     && worktreeState.isTopLevel
     && selectedCwd
@@ -957,7 +1003,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {customPathOpen && (
+      {runtimeMode?.directorySelectionEnabled && customPathOpen && (
         <DirectoryPicker
           busy={customPathValidating}
           error={customPathError}
@@ -1062,7 +1108,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         {/* CWD picker */}
         <div ref={dropdownRef} style={{ position: "relative" }}>
           <button
-            onClick={() => setDropdownOpen((v) => !v)}
+            onClick={() => {
+              if (runtimeMode?.directorySelectionEnabled) setDropdownOpen((v) => !v);
+            }}
+            disabled={!runtimeMode || !runtimeMode.directorySelectionEnabled}
             title={selectedProject?.root ?? selectedCwd ?? ""}
             style={{
               width: "100%",
@@ -1072,7 +1121,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               background: selectedCwd ? "var(--bg-hover)" : "rgba(37,99,235,0.06)",
               border: selectedCwd ? "1px solid var(--border)" : "1px solid rgba(37,99,235,0.4)",
               borderRadius: 7,
-              cursor: "pointer",
+              cursor: runtimeMode?.directorySelectionEnabled ? "pointer" : "default",
               fontSize: 12,
               color: "var(--text)",
               textAlign: "left",
@@ -1121,7 +1170,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           </button>
 
           <AnimatedDropdown
-            open={dropdownOpen}
+            open={Boolean(runtimeMode?.directorySelectionEnabled && dropdownOpen)}
             style={{
               position: "absolute",
               top: "calc(100% + 4px)",
@@ -1236,7 +1285,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 </button>
               )}
 
-              {/* Custom path directory picker */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1625,12 +1673,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             {t("sidebar.loading")}
           </div>
         )}
-        {error && (
+        {(runtimeModeError ?? error) && (
           <div style={{ padding: "12px 14px", color: "#f87171", fontSize: 12 }}>
-            {error}
+            {runtimeModeError ?? error}
           </div>
         )}
-        {!loading && !error && filteredSessions.length === 0 && (
+        {!loading && !runtimeModeError && !error && filteredSessions.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             {t("sidebar.noSessions")}
           </div>

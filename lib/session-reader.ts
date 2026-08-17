@@ -15,6 +15,15 @@ import { resolveProject, type ProjectInfo } from "./worktree";
 
 export { getAgentDir };
 
+const sessionCustomData = new WeakMap<SessionInfo, Record<string, unknown>>();
+
+export function getSessionCustomData(
+  session: SessionInfo,
+  customType: string,
+): unknown {
+  return sessionCustomData.get(session)?.[customType];
+}
+
 export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise<SessionInfo[]> {
   const uniqueCwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
   const projectByCwd = new Map<string, ProjectInfo>();
@@ -65,7 +74,11 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
       transient: false,
     };
   });
-  return attachSessionProjectInfo(sessions);
+  const attached = await attachSessionProjectInfo(sessions);
+  attached.forEach((session, index) => {
+    sessionCustomData.set(session, piSessions[index]?.customData ?? {});
+  });
+  return attached;
 }
 
 export async function listAllSessions(options: { force?: boolean } = {}): Promise<SessionInfo[]> {
@@ -249,7 +262,7 @@ export function buildSessionContext(
   const entryIds: string[] = [];
   for (const entry of contextEntries) {
     const localEntry = entry as unknown as SessionEntry;
-    const m = entryToUiMessage(localEntry, options);
+    const m = sessionEntryToUiMessage(localEntry, options);
     if (m) {
       messages.push(m);
       entryIds.push(localEntry.id);
@@ -317,7 +330,7 @@ function omitToolResultBase64Images(message: AgentMessage): AgentMessage {
 
 // Convert a session entry on the active branch into a UI message.
 // Returns null for entries that do not map to chat history (metadata, non-message types).
-function entryToUiMessage(
+export function sessionEntryToUiMessage(
   entry: SessionEntry,
   options: { deferThinking?: boolean; deferToolResultImages?: boolean },
 ): AgentMessage | null {

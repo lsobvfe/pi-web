@@ -5,6 +5,7 @@ import { isAbsolute, resolve } from "path";
 import { allowFileRoot } from "@/lib/file-access";
 import { projectIdentityKey } from "@/lib/project-identity";
 import { resolveProject } from "@/lib/worktree";
+import { assertRuntimeWorkspaceCwd, isManagedMode } from "@/lib/managed-mode";
 
 function normalizeCwd(cwd: string): string {
   if (cwd === "~") return homedir();
@@ -23,7 +24,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Path is required" }, { status: 400 });
     }
 
-    const normalizedCwd = normalizeCwd(cwd);
+    let normalizedCwd: string;
+    if (isManagedMode()) {
+      try {
+        normalizedCwd = assertRuntimeWorkspaceCwd(normalizeCwd(cwd));
+      } catch {
+        return NextResponse.json(
+          { error: "PI_WEB_MANAGED_WORKSPACE_REQUIRED" },
+          { status: 403 },
+        );
+      }
+    } else {
+      normalizedCwd = normalizeCwd(cwd);
+    }
     let stat: Stats;
     try {
       stat = statSync(normalizedCwd);

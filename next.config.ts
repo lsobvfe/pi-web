@@ -5,6 +5,15 @@ import { fileURLToPath } from "url";
 
 const configDir = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(configDir, "package.json"), "utf8")) as { version: string };
+export const piExternalPackages = [
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-tui",
+] as const;
+type WebpackExternalRequest = { request?: string };
+type WebpackExternalCallback = (error?: Error | null, result?: string) => void;
+
 let piVersion = "unknown";
 try {
   const piPkgPath = join(configDir, "node_modules/@earendil-works/pi-coding-agent/package.json");
@@ -15,10 +24,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: configDir,
   serverExternalPackages: [
     "undici",
-    "@earendil-works/pi-coding-agent",
-    "@earendil-works/pi-agent-core",
-    "@earendil-works/pi-ai",
-    "@earendil-works/pi-tui",
+    ...piExternalPackages,
   ],
   allowedDevOrigins: ["127.0.0.1", "192.168.*.*"],
   async headers() {
@@ -47,6 +53,25 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
     NEXT_PUBLIC_PI_VERSION: piVersion,
+  },
+  webpack(config, { isServer }) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@": configDir,
+    };
+    if (isServer) {
+      const piPackages = new Set<string>(piExternalPackages);
+      config.externals.push(
+        ({ request }: WebpackExternalRequest, callback: WebpackExternalCallback) => {
+          if (request && piPackages.has(request)) {
+            callback(null, `module ${request}`);
+            return;
+          }
+          callback();
+        },
+      );
+    }
+    return config;
   },
 };
 

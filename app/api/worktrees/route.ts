@@ -3,6 +3,13 @@ import { existsSync } from "fs";
 import { addWorktree, findCurrentWorktreePath, listWorktrees, removeWorktree, resolveProject } from "@/lib/worktree";
 import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
 import { projectIdentityKey } from "@/lib/project-identity";
+import { isManagedMode } from "@/lib/managed-mode";
+
+function managedModeResponse(): NextResponse | null {
+  return isManagedMode()
+    ? NextResponse.json({ error: "PI_WEB_MANAGED_WORKTREES_DISABLED" }, { status: 403 })
+    : null;
+}
 
 /** Same gate as /api/files: only session cwds / project roots / explicitly
  *  allowed dirs may be inspected or mutated through this endpoint. */
@@ -17,6 +24,8 @@ async function checkCwdAllowed(cwd: string): Promise<NextResponse | null> {
 // GET /api/worktrees?cwd=  →  { projectRoot, projectKey, isGit, isTopLevel, currentWorktreePath, worktrees }
 export async function GET(req: Request) {
   try {
+    const unavailable = managedModeResponse();
+    if (unavailable) return unavailable;
     const cwd = new URL(req.url).searchParams.get("cwd");
     if (!cwd) {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
@@ -56,6 +65,8 @@ export async function GET(req: Request) {
 // POST /api/worktrees  body: { cwd, branch }  →  { path, branch }
 export async function POST(req: Request) {
   try {
+    const unavailable = managedModeResponse();
+    if (unavailable) return unavailable;
     const body = await req.json() as { cwd?: string; branch?: string };
     if (!body.cwd || typeof body.cwd !== "string") {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
@@ -80,6 +91,8 @@ export async function POST(req: Request) {
 // DELETE /api/worktrees  body: { cwd, path, force? }
 export async function DELETE(req: Request) {
   try {
+    const unavailable = managedModeResponse();
+    if (unavailable) return unavailable;
     const body = await req.json() as { cwd?: string; path?: string; force?: boolean };
     if (!body.cwd || typeof body.cwd !== "string") {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });

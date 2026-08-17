@@ -68,3 +68,12 @@ test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(sessionItemSource, /if \(session\.transient\) return;/);
   assert.match(sessionItemSource, /\{hovered && !session\.transient && \(/);
 });
+
+test("managed mode selects the server-provided workspace and never enables directory selection speculatively", () => {
+  assert.match(source, /fetch\("\/api\/runtime\/mode"\)/);
+  assert.match(source, /if \(value\.managed && value\.workspaceRoot\) \{[\s\S]*?setSelectedCwd\(value\.workspaceRoot\)/);
+  assert.match(source, /disabled=\{!runtimeMode \|\| !runtimeMode\.directorySelectionEnabled\}/);
+  assert.match(source, /runtimeMode\?\.directorySelectionEnabled && customPathOpen/);
+  assert.match(source, /runtimeMode\?\.directorySelectionEnabled[\s\S]*?worktreeState\?\.isGit/);
+  assert.doesNotMatch(source, /NEXT_PUBLIC_PI_WEB_MANAGED/);
+});
