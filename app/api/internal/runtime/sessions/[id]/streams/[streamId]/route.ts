@@ -29,8 +29,7 @@ export async function GET(
     if (typeof value.thinkingLevel === "string") {
       await session.send({ type: "set_thinking_level", level: value.thinkingLevel });
     }
-    const eventStream = createRuntimeTurnStream(req, session);
-    await session.send({
+    const eventStream = createRuntimeTurnStream(req, session, () => session.send({
       type: "prompt",
       message: value.message,
       images: value.images,
@@ -47,7 +46,7 @@ export async function GET(
       ...(typeof value.systemPrompt === "string"
         ? { systemPrompt: value.systemPrompt }
         : {}),
-    });
+    }));
     return new Response(eventStream, {
       headers: {
         "Content-Type": "text/event-stream",

@@ -18,6 +18,7 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 export function createRuntimeTurnStream(
   req: Request,
   session: RuntimeTurnSession,
+  startTurn: () => Promise<unknown>,
 ): ReadableStream<Uint8Array> {
   let cancel: (closeController: boolean) => void = () => {};
 
@@ -111,6 +112,12 @@ export function createRuntimeTurnStream(
       req.signal.addEventListener("abort", abortHandler, { once: true });
       heartbeat = setInterval(() => enqueue(":\n\n"), HEARTBEAT_INTERVAL_MS);
       enqueue(":\n\n");
+      queueMicrotask(() => {
+        if (closed) return;
+        void startTurn().catch((error) => {
+          finishWithError(error instanceof Error ? error.message : String(error));
+        });
+      });
     },
     cancel() {
       cancel(false);
