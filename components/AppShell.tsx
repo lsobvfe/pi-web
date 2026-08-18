@@ -1,7 +1,8 @@
 "use client";
+import { piWebFetch } from "../lib/embedded-host";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePiWebNavigation } from "@/hooks/usePiWebNavigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -62,8 +63,7 @@ const TOP_BAR_ICON_BUTTON_SIZE = 36;
 const LANGUAGE_MENU_WIDTH = 176;
 
 export function AppShell() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { replace: replaceUrl, searchParams } = usePiWebNavigation();
   const [initialNavigation] = useState(() => getInitialNavigation(searchParams));
   const { preference, toggleTheme } = useTheme();
   const themeLabelKey =
@@ -419,7 +419,7 @@ export function AppShell() {
     setInitialCwdStatus("validating");
     setInitialCwdError(null);
 
-    void fetch("/api/cwd/validate", {
+    void piWebFetch("/api/cwd/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cwd: requestedCwd }),
@@ -457,7 +457,7 @@ export function AppShell() {
     const token = ++workspaceRestoreTokenRef.current;
     const lastOpenSessionId = getLastOpenSession(projectKey);
     if (!lastOpenSessionId) return;
-    void fetch("/api/sessions")
+    void piWebFetch("/api/sessions")
       .then((r) => (r.ok ? (r.json() as Promise<{ sessions: SessionInfo[] }>) : null))
       .then((d) => {
         if (token !== workspaceRestoreTokenRef.current) return; // stale switch
@@ -481,13 +481,13 @@ export function AppShell() {
         setSelectedSession(s);
         setSessionKey((k) => k + 1);
         if (new URLSearchParams(window.location.search).get("session") !== s.id) {
-          router.replace(`?session=${encodeURIComponent(s.id)}`, { scroll: false });
+          replaceUrl(`?session=${encodeURIComponent(s.id)}`, { scroll: false });
         }
       })
       .catch(() => {
         // Network hiccup: keep the remembered session for a later retry.
       });
-  }, [router]);
+  }, [replaceUrl]);
 
   const handleCwdChange = useCallback((
     cwd: string | null,
@@ -550,8 +550,8 @@ export function AppShell() {
       // the default welcome page when none is remembered.
       restoreWorkspaceContext(newProject);
     }
-    router.replace("/", { scroll: false });
-  }, [activeCwd, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
+    replaceUrl("/", { scroll: false });
+  }, [activeCwd, invalidateWorkspaceRestore, newSessionCwd, replaceUrl, selectedSession, restoreWorkspaceContext]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
     invalidateWorkspaceRestore();
@@ -581,12 +581,12 @@ export function AppShell() {
       // onCwdChange effect firing after setSelectedCwd in the sidebar
       suppressCwdBumpRef.current = true;
     }
-    // Skip router.replace when restoring from URL — the param is already correct
+    // Skip URL replacement when restoring from URL — the param is already correct.
     // and calling replace in production Next.js triggers a Suspense remount loop
     if (!isRestore) {
-      router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
+      replaceUrl(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [invalidateWorkspaceRestore, router, isMobile, selectedSession]);
+  }, [invalidateWorkspaceRestore, replaceUrl, isMobile, selectedSession]);
 
   const handleNewSession = useCallback((sessionId: string, cwd: string) => {
     invalidateWorkspaceRestore();
@@ -602,8 +602,8 @@ export function AppShell() {
     setSystemPromptLoading(false);
     setActiveTopPanel(null);
     if (isMobile) setSidebarOpen(false);
-    router.replace("/", { scroll: false });
-  }, [invalidateWorkspaceRestore, router, isMobile]);
+    replaceUrl("/", { scroll: false });
+  }, [invalidateWorkspaceRestore, replaceUrl, isMobile]);
 
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
   useGlobalKeyboardShortcuts({
@@ -616,7 +616,7 @@ export function AppShell() {
   // handleCwdChange relies on. Hydrate it from the session list so switching
   // worktrees right after creating a session doesn't close the chat.
   const hydrateSelectedSession = useCallback((sessionId: string) => {
-    void fetch("/api/sessions", { cache: "no-store" })
+    void piWebFetch("/api/sessions", { cache: "no-store" })
       .then((r) => (r.ok ? (r.json() as Promise<{ sessions: SessionInfo[] }>) : null))
       .then((d) => {
         const full = d?.sessions.find((s) => s.id === sessionId);
@@ -639,8 +639,8 @@ export function AppShell() {
     setNewSessionCwd(null);
     setSelectedSession(session);
     hydrateSelectedSession(session.id);
-    router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
-  }, [invalidateWorkspaceRestore, router, hydrateSelectedSession]);
+      replaceUrl(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
+  }, [invalidateWorkspaceRestore, replaceUrl, hydrateSelectedSession]);
 
   const deliverSessionNotification = useCallback(({
     targetSession,
@@ -712,7 +712,7 @@ export function AppShell() {
     setAutoNameStatus({ kind: "naming" });
 
     try {
-      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/auto-name`, {
+      const response = await piWebFetch(`/api/sessions/${encodeURIComponent(sessionId)}/auto-name`, {
         method: "POST",
       });
       const body = (await response.json().catch(() => ({}))) as { title?: string; error?: string };
@@ -756,8 +756,8 @@ export function AppShell() {
       transient: false,
     }));
     hydrateSelectedSession(newSessionId);
-    router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
-  }, [invalidateWorkspaceRestore, router, hydrateSelectedSession]);
+    replaceUrl(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
+  }, [invalidateWorkspaceRestore, replaceUrl, hydrateSelectedSession]);
 
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
@@ -781,9 +781,9 @@ export function AppShell() {
       setSystemPrompt(null);
       setSystemPromptLoading(false);
       setActiveTopPanel(null);
-      router.replace("/", { scroll: false });
+    replaceUrl("/", { scroll: false });
     }
-  }, [invalidateWorkspaceRestore, selectedSession, router]);
+  }, [invalidateWorkspaceRestore, selectedSession, replaceUrl]);
 
   const handleOpenFile = useCallback((
     filePath: string,
@@ -852,7 +852,7 @@ export function AppShell() {
     if (!projectTrustCwd) return;
 
     const controller = new AbortController();
-    fetch(`/api/project-trust?cwd=${encodeURIComponent(projectTrustCwd)}`, {
+    piWebFetch(`/api/project-trust?cwd=${encodeURIComponent(projectTrustCwd)}`, {
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -872,7 +872,7 @@ export function AppShell() {
     setProjectTrustBusy(true);
     setProjectTrustError(null);
     try {
-      const response = await fetch("/api/project-trust", {
+      const response = await piWebFetch("/api/project-trust", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: projectTrustCwd }),

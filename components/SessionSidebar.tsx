@@ -1,4 +1,5 @@
 "use client";
+import { piWebFetch } from "../lib/embedded-host";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { SessionInfo } from "@/lib/types";
@@ -439,7 +440,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/runtime/mode")
+    piWebFetch("/api/runtime/mode")
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json() as Promise<RuntimeMode>;
@@ -483,7 +484,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const loadSessions = useCallback(async (showLoading = false, force = false) => {
     try {
       if (showLoading) setLoading(true);
-      const res = await fetch(force ? "/api/sessions?force=1" : "/api/sessions", {
+      const res = await piWebFetch(force ? "/api/sessions?force=1" : "/api/sessions", {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -555,7 +556,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       controller?.abort();
       controller = current;
       try {
-        const res = await fetch("/api/agent/running", {
+        const res = await piWebFetch("/api/agent/running", {
           cache: "no-store",
           signal: current.signal,
         });
@@ -637,7 +638,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, [explorerRefreshKey]);
 
   useEffect(() => {
-    fetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
+    piWebFetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
       if (d.home) setHomeDir(d.home);
     }).catch(() => {});
   }, []);
@@ -711,7 +712,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
     let cancelled = false;
     setWorktreeLoadingCwd(selectedCwd);
-    fetch(`/api/worktrees?cwd=${encodeURIComponent(selectedCwd)}`)
+    piWebFetch(`/api/worktrees?cwd=${encodeURIComponent(selectedCwd)}`)
       .then((r) => r.json())
       .then((d: { projectRoot?: string; projectKey?: string; isGit?: boolean; isTopLevel?: boolean; currentWorktreePath?: string | null; worktrees?: WorktreeEntry[]; error?: string }) => {
         if (cancelled) return;
@@ -780,7 +781,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     setCustomPathValidating(true);
     setCustomPathError(null);
     try {
-      const res = await fetch("/api/cwd/validate", {
+      const res = await piWebFetch("/api/cwd/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: path }),
@@ -818,7 +819,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, []);
   const handleDefaultCwd = useCallback(async () => {
     try {
-      const res = await fetch("/api/default-cwd", { method: "POST" });
+      const res = await piWebFetch("/api/default-cwd", { method: "POST" });
       const data = await res.json() as { cwd?: string; error?: string };
       if (data.cwd) {
         setSelectedCwd(data.cwd);
@@ -838,7 +839,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     setWtBusy(true);
     setWtError(null);
     try {
-      const res = await fetch("/api/worktrees", {
+      const res = await piWebFetch("/api/worktrees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: worktreeState.projectRoot, branch }),
@@ -874,7 +875,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     setWtBusy(true);
     setWtError(null);
     try {
-      const res = await fetch("/api/worktrees", {
+      const res = await piWebFetch("/api/worktrees", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: worktreeState.projectRoot, path, force }),
@@ -2064,7 +2065,7 @@ function SessionItem({
     // a skill-invoked session stays a no-op instead of persisting raw XML.)
     if (renameValue === title || name === (session.name ?? "")) return;
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+      await piWebFetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -2080,7 +2081,7 @@ function SessionItem({
     setConfirmDelete(false);
     setDeleting(true);
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
+      await piWebFetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
       onDeleted?.(session.id);
     } catch {
       setDeleting(false);

@@ -1,3 +1,4 @@
+import { piWebFetch } from "./embedded-host";
 // Client-side helper for POST /api/agent/[id].
 //
 // Every /api/agent/[id] route returns one of:
@@ -29,7 +30,7 @@ export async function sendAgentCommand<T = unknown>(
   sessionId: string,
   command: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(`/api/agent/${encodeURIComponent(sessionId)}`, {
+  const res = await piWebFetch(`/api/agent/${encodeURIComponent(sessionId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(command),

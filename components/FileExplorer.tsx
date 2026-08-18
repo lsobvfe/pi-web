@@ -1,4 +1,5 @@
 "use client";
+import { piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
 
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { getFileIcon, FolderIcon } from "./FileIcons";
@@ -19,6 +20,15 @@ interface FileEntry {
   isDir: boolean;
   size: number;
   modified: string;
+}
+
+function AuthenticatedDownloadLink({
+  url,
+  fileName,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { url: string; fileName: string }) {
+  const resourceUrl = usePiWebResourceUrl(url);
+  return <a {...props} href={resourceUrl ?? undefined} download={fileName} />;
 }
 
 interface FileNode {
@@ -76,7 +86,7 @@ interface PendingConflict {
 
 async function fetchEntries(dirPath: string): Promise<FileNode[]> {
   const encoded = encodeFilePathForApi(dirPath);
-  const res = await fetch(`/api/files/${encoded}?type=list`);
+  const res = await piWebFetch(`/api/files/${encoded}?type=list`);
   if (!res.ok) {
     let message = `Failed to load files (HTTP ${res.status})`;
     try {
@@ -100,7 +110,7 @@ async function fetchEntries(dirPath: string): Promise<FileNode[]> {
 
 async function fetchGitStatus(cwd: string): Promise<GitStatusResponse> {
   const params = new URLSearchParams({ cwd });
-  const res = await fetch(`/api/git/status?${params.toString()}`);
+  const res = await piWebFetch(`/api/git/status?${params.toString()}`);
   if (!res.ok) throw new Error(`Failed to load Git status (HTTP ${res.status})`);
   return res.json() as Promise<GitStatusResponse>;
 }
@@ -152,32 +162,15 @@ function uploadFiles(
   strategy: UploadConflictStrategy,
   onProgress: (progress: number) => void,
 ): Promise<{ status: number; data: UploadResponse }> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file, file.name));
-
-    const xhr = new XMLHttpRequest();
-    xhr.open(
-      "POST",
-      `/api/files/${encodeFilePathForApi(targetDirectory)}?type=upload&conflict=${strategy}`,
-    );
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && event.total > 0) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Network error while uploading files"));
-    xhr.onabort = () => reject(new Error("Upload cancelled"));
-    xhr.onload = () => {
-      let data: UploadResponse = {};
-      try {
-        data = JSON.parse(xhr.responseText) as UploadResponse;
-      } catch {
-        if (xhr.responseText) data.error = xhr.responseText;
-      }
-      resolve({ status: xhr.status, data });
-    };
-    xhr.send(formData);
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file, file.name));
+  return piWebFetch(
+    `/api/files/${encodeFilePathForApi(targetDirectory)}?type=upload&conflict=${strategy}`,
+    { method: "POST", body: formData },
+  ).then(async (response) => {
+    onProgress(100);
+    const data = await response.json().catch(() => ({})) as UploadResponse;
+    return { status: response.status, data };
   });
 }
 
@@ -392,9 +385,9 @@ function TreeNode({
           </button>
         )}
         {hovered && !node.isDir && (
-          <a
-            href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
-            download
+          <AuthenticatedDownloadLink
+            url={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
+            fileName={node.name}
             onClick={(e) => e.stopPropagation()}
             title={t("files.download")}
             style={{
@@ -424,7 +417,7 @@ function TreeNode({
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-          </a>
+          </AuthenticatedDownloadLink>
         )}
       </div>
       {node.isDir && open && (
@@ -624,7 +617,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     setUploadPhase("checking");
 
     try {
-      const res = await fetch(
+      const res = await piWebFetch(
         `/api/files/${encodeFilePathForApi(cwd)}?type=upload-check`,
         {
           method: "POST",

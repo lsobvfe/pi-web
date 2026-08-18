@@ -1,4 +1,5 @@
 "use client";
+import { piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import { MarkdownBody } from "./MarkdownBody";
@@ -155,7 +156,7 @@ function loadThinkingContent(sessionId: string, entryId: string, blockIndex: num
     return cached;
   }
 
-  const request = fetch(
+  const request = piWebFetch(
     `/api/sessions/${encodeURIComponent(sessionId)}/entries/${encodeURIComponent(entryId)}/thinking?blockIndex=${blockIndex}`,
   ).then(async (response) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1650,6 +1651,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
   const fullOutputUrl = sessionId && message.fullOutputPath
     ? `/api/agent/${encodeURIComponent(sessionId)}/bash-output?path=${encodeURIComponent(message.fullOutputPath)}`
     : null;
+  const downloadUrl = usePiWebResourceUrl(fullOutputUrl ? `${fullOutputUrl}&download=1` : null);
   const showFullButton = message.truncated && fullOutputUrl && fullOutput === null;
   const displayOutput = fullOutput ?? message.output;
 
@@ -1658,7 +1660,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
     setLoadingFull(true);
     setFullError(null);
     try {
-      const res = await fetch(fullOutputUrl);
+      const res = await piWebFetch(fullOutputUrl);
       const d = await res.json() as { success?: boolean; data?: { output?: string }; error?: string };
       if (d.success) {
         setFullOutput(d.data?.output ?? "");
@@ -1708,7 +1710,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
             </button>
           )}
           <a
-            href={`${fullOutputUrl}&download=1`}
+            href={downloadUrl ?? undefined}
             style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
           >
             download full output

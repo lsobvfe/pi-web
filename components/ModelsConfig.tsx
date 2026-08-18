@@ -1,4 +1,5 @@
 "use client";
+import { piWebEventSource, piWebFetch } from "../lib/embedded-host";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -352,7 +353,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
     setDiscoveryState({ phase: "loading" });
     setSelectedModelIds([]);
     try {
-      const res = await fetch("/api/models-config/discover", {
+      const res = await piWebFetch("/api/models-config/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerName: name, provider: { ...provider, models: undefined } }),
@@ -905,7 +906,7 @@ function ModelDetail({
     if (!model.id.trim() || testState.phase === "testing") return;
     setTestState({ phase: "testing" });
     try {
-      const res = await fetch("/api/models-config/test", {
+      const res = await piWebFetch("/api/models-config/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerName, provider, model }),
@@ -945,7 +946,7 @@ function ModelDetail({
     try {
       const params = new URLSearchParams({ q: query, provider: providerName, limit: "50" });
       if (provider.baseUrl?.trim()) params.set("baseUrl", provider.baseUrl.trim());
-      const res = await fetch(`/api/models-config/catalog?${params}`);
+      const res = await piWebFetch(`/api/models-config/catalog?${params}`);
       const data = await res.json() as { recommendation?: ModelCatalogRecommendation; error?: string };
       if (requestId !== catalogRequestIdRef.current) return;
       if (!res.ok || data.error || !data.recommendation) {
@@ -1353,7 +1354,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
-    const es = new EventSource(`/api/auth/login/${encodeURIComponent(provider.id)}`);
+    const es = piWebEventSource(`/api/auth/login/${encodeURIComponent(provider.id)}`);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
@@ -1400,7 +1401,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   }, [provider.id, onRefresh]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
+    await piWebFetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     onRefresh();
   }, [provider.id, onRefresh]);
@@ -1409,7 +1410,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     if (!code.trim()) return;
     setLoginState({ phase: "progress", message: "Verifying…" });
     try {
-      const res = await fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
+      const res = await piWebFetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, code: code.trim() }),
@@ -1429,7 +1430,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const submitSelection = useCallback(async (token: string, value: string) => {
     setLoginState({ phase: "progress", message: "Continuing…" });
     try {
-      const res = await fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
+      const res = await piWebFetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, code: value }),
@@ -1604,7 +1605,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
     setError(null);
     setSavedOk(false);
     try {
-      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}`, {
+      const res = await piWebFetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: apiKey.trim() }),
@@ -1629,7 +1630,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
     setRemoving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}`, { method: "DELETE" });
+      const res = await piWebFetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}`, { method: "DELETE" });
       const d = await res.json() as { success?: boolean; error?: string };
       if (!res.ok || d.error) setError(d.error ?? `HTTP ${res.status}`);
       else onRefresh();
@@ -1905,7 +1906,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const loadOAuthProviders = useCallback(() => {
-    fetch("/api/auth/providers")
+    piWebFetch("/api/auth/providers")
       .then((r) => r.json())
       .then((d: { providers?: OAuthProvider[] }) => {
         if (Array.isArray(d.providers)) setOauthProviders(d.providers);
@@ -1914,7 +1915,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
   }, []);
 
   const loadApiKeyProviders = useCallback(() => {
-    fetch("/api/auth/all-providers")
+    piWebFetch("/api/auth/all-providers")
       .then((r) => r.json())
       .then((d: { providers?: ApiKeyProvider[] }) => {
         if (Array.isArray(d.providers)) setApiKeyProviders(d.providers);
@@ -1932,7 +1933,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
   }, [loadOAuthProviders, loadApiKeyProviders]);
 
   useEffect(() => {
-    fetch("/api/models-config")
+    piWebFetch("/api/models-config")
       .then((r) => r.json())
       .then((d: ModelsJson) => {
         const normalized = d.providers ? d : { ...d, providers: {} };
@@ -2037,7 +2038,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     setSaveError(null);
     setSavedOk(false);
     try {
-      const res = await fetch("/api/models-config", {
+      const res = await piWebFetch("/api/models-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),

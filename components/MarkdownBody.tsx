@@ -2,6 +2,7 @@
 
 import { useMemo, type MouseEvent } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { usePiWebResourceUrl } from "../lib/embedded-host";
 import { resolveLocalFileHref } from "@/lib/file-links";
 import { encodeFilePathForApi } from "@/lib/file-paths";
 import { markdownRehypePlugins, markdownRemarkPlugins, normalizeDisplayMath } from "@/lib/markdown";
@@ -13,6 +14,11 @@ interface MarkdownBodyProps {
   isStreaming?: boolean;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
+}
+
+function AuthenticatedMarkdownImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const src = usePiWebResourceUrl(typeof props.src === "string" ? props.src : null);
+  return <img {...props} src={src ?? undefined} loading="lazy" />;
 }
 
 export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile }: MarkdownBodyProps) {
@@ -77,7 +83,7 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
         : src;
       // Dynamic local paths are served directly by the file API.
       // eslint-disable-next-line @next/next/no-img-element
-      return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
+        return <AuthenticatedMarkdownImage src={imageSrc} alt={alt ?? ""} {...props} />;
     },
     table({ children }) {
       return (

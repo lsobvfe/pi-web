@@ -1,4 +1,5 @@
 "use client";
+import { piWebEventSource, piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
 import {
@@ -221,9 +222,10 @@ function getFileApiUrl(
 
 function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceSessionId?: string | null }) {
   const { t } = useI18n();
+  const href = usePiWebResourceUrl(getFileApiUrl(filePath, "download", sourceSessionId));
   return (
     <a
-      href={getFileApiUrl(filePath, "download", sourceSessionId)}
+      href={href ?? undefined}
       download={getFileName(filePath)}
       title={t("i18n.downloadFile")}
       aria-label={t("i18n.downloadFile")}
@@ -236,6 +238,11 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
       </svg>
     </a>
   );
+}
+
+function AuthenticatedMarkdownImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const src = usePiWebResourceUrl(typeof props.src === "string" ? props.src : null);
+  return <img {...props} src={src ?? undefined} loading="lazy" />;
 }
 
 type DiffLine = {
@@ -455,7 +462,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
     let active = true;
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
-      fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
+      piWebFetch(getFileApiUrl(filePath, "meta", sourceSessionId))
         .then((response) => response.json())
         .then((next: { size?: number; error?: string }) => {
           if (!active || requestId !== syncRequestRef.current) return;
@@ -473,7 +480,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = piWebEventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -504,6 +511,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   }, [filePath, sourceSessionId, watchEnabled]);
 
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
+  const resourceSrc = usePiWebResourceUrl(src);
 
   const formatSizeStr = size != null ? formatSize(size) : null;
 
@@ -566,7 +574,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={src}
+            src={resourceSrc ?? undefined}
             alt={filePath}
             onLoad={(e) => {
               const img = e.currentTarget;
@@ -627,7 +635,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
     let active = true;
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
-      fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
+      piWebFetch(getFileApiUrl(filePath, "meta", sourceSessionId))
         .then((response) => response.json())
         .then((next: { size?: number; error?: string }) => {
           if (!active || requestId !== syncRequestRef.current) return;
@@ -645,7 +653,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = piWebEventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -676,6 +684,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   }, [filePath, sourceSessionId, watchEnabled]);
 
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
+  const resourceSrc = usePiWebResourceUrl(src);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -736,7 +745,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
             key={src}
             controls
             preload="metadata"
-            src={src}
+            src={resourceSrc ?? undefined}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             onError={() => setError("Failed to load audio")}
             style={{ width: "100%" }}
@@ -761,6 +770,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
   const previewUrl = isPdf
     ? getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined)
     : getFileApiUrl(filePath, "preview", sourceSessionId, bust ? { v: bust } : undefined);
+  const resourcePreviewUrl = usePiWebResourceUrl(previewUrl);
 
   useEffect(() => {
     setBust(0);
@@ -770,7 +780,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
 
     let active = true;
     const requestId = ++syncRequestRef.current;
-    fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
+    piWebFetch(getFileApiUrl(filePath, "meta", sourceSessionId))
       .then((r) => r.json())
       .then((d: { size?: number; error?: string }) => {
         if (!active || requestId !== syncRequestRef.current) return;
@@ -804,7 +814,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
     let active = true;
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
-      fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
+      piWebFetch(getFileApiUrl(filePath, "meta", sourceSessionId))
         .then((r) => r.json())
         .then((d: { size?: number; error?: string }) => {
           if (!active || requestId !== syncRequestRef.current) return;
@@ -827,7 +837,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = piWebEventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -907,8 +917,8 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
           </div>
         ) : (
           <iframe
-            key={previewUrl}
-            src={previewUrl}
+            key={resourcePreviewUrl ?? previewUrl}
+            src={resourcePreviewUrl ?? undefined}
             sandbox={isPdf ? undefined : "allow-same-origin"}
             title={t("i18n.previewFile", { file: getFileName(filePath) })}
             style={{ width: "100%", height: "100%", border: "none", background: isPdf ? "var(--bg)" : "#eef1f5" }}
@@ -1047,7 +1057,7 @@ function TextFileViewer({
 
   const fetchContent = useCallback((filePath: string) => {
     const requestId = ++contentRequestRef.current;
-    return fetch(getFileApiUrl(filePath, "read", sourceSessionId))
+    return piWebFetch(getFileApiUrl(filePath, "read", sourceSessionId))
       .then((r) => r.json())
       .then((d: FileData & { error?: string }) => {
         if (requestId !== contentRequestRef.current) return null;
@@ -1078,7 +1088,7 @@ function TextFileViewer({
 
     try {
       const params = new URLSearchParams({ cwd, path: targetPath });
-      const response = await fetch(`/api/git/diff?${params.toString()}`);
+      const response = await piWebFetch(`/api/git/diff?${params.toString()}`);
       const next = await response.json() as GitFileDiffResponse & { error?: string };
       if (requestId !== gitDiffRequestRef.current) return;
       setGitDiff(response.ok && next.supported && typeof next.patch === "string" ? next : null);
@@ -1127,7 +1137,7 @@ function TextFileViewer({
       void fetchGitDiff(filePath);
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = piWebEventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -1494,7 +1504,7 @@ function TextFileViewer({
                     : src;
                   // Dynamic local paths are served directly by the file API.
                   // eslint-disable-next-line @next/next/no-img-element
-                  return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
+                  return <AuthenticatedMarkdownImage src={imageSrc} alt={alt ?? ""} {...props} />;
                 },
               }}
             >

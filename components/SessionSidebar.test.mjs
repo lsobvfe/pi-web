@@ -20,7 +20,7 @@ test("does not register row-level session deletion shortcuts", () => {
 
 test("polls running sessions only while the tab is visible", () => {
   assert.doesNotMatch(source, /new EventSource\("\/api\/agent\/running\/events"\)/);
-  assert.match(source, /fetch\("\/api\/agent\/running"/);
+  assert.match(source, /piWebFetch\("\/api\/agent\/running"/);
   assert.match(source, /document\.visibilityState !== "visible"/);
   assert.match(source, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/);
 });
@@ -70,7 +70,7 @@ test("does not expose disk-backed actions for transient sessions", () => {
 });
 
 test("managed mode selects the server-provided workspace and never enables directory selection speculatively", () => {
-  assert.match(source, /fetch\("\/api\/runtime\/mode"\)/);
+  assert.match(source, /piWebFetch\("\/api\/runtime\/mode"\)/);
   assert.match(source, /if \(value\.managed && value\.workspaceRoot\) \{[\s\S]*?setSelectedCwd\(value\.workspaceRoot\)/);
   assert.match(source, /disabled=\{!runtimeMode \|\| !runtimeMode\.directorySelectionEnabled\}/);
   assert.match(source, /runtimeMode\?\.directorySelectionEnabled && customPathOpen/);

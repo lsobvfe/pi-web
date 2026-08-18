@@ -1,4 +1,5 @@
 "use client";
+import { piWebFetch } from "../lib/embedded-host";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
@@ -80,7 +81,7 @@ function NewSessionUpdateLink({
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/app-update", { signal: controller.signal })
+    void piWebFetch("/api/app-update", { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) return null;
         return response.json() as Promise<AppUpdateResponse>;

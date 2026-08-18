@@ -26,7 +26,7 @@ for (const [name, nextName] of [
   test(`${name} pauses its watcher and synchronizes after connecting`, () => {
     const block = functionBlock(name, nextName);
     const guard = block.indexOf("if (!watchEnabled) return;");
-    const eventSource = block.indexOf("new EventSource", guard);
+    const eventSource = Math.max(block.indexOf("new EventSource", guard), block.indexOf("piWebEventSource", guard));
     const synchronize = block.indexOf("synchronize();", eventSource);
 
     assert.ok(guard >= 0, "watchEnabled guard missing");

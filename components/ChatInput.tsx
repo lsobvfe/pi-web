@@ -1,4 +1,5 @@
 "use client";
+import { piWebFetch } from "../lib/embedded-host";
 
 import React, { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
@@ -827,7 +828,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     const fetchCwd = cwd;
     const query = atQueryText;
     const timer = setTimeout(() => {
-      fetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}&q=${encodeURIComponent(query)}`)
+      piWebFetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}&q=${encodeURIComponent(query)}`)
         .then((res) => {
           if (!res.ok) throw new Error(`file search failed: ${res.status}`);
           return res.json() as Promise<{ matches?: FileIndexEntry[] }>;
@@ -870,7 +871,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     fileIndexFetchingRef.current = cwd;
     const fetchCwd = cwd;
     setFileIndexLoading(true);
-    fetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}`)
+    piWebFetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`file index failed: ${res.status}`);
         return res.json() as Promise<{ files?: string[]; truncated?: boolean }>;
@@ -1206,7 +1207,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     const requestCwd = cwd;
     let cancelled = false;
     setSkillDormancyState({ cwd: requestCwd, values: {} });
-    fetch(`/api/skills?cwd=${encodeURIComponent(requestCwd)}`)
+    piWebFetch(`/api/skills?cwd=${encodeURIComponent(requestCwd)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`skills fetch failed: ${res.status}`);
         return res.json() as Promise<Partial<SkillsResponse>>;
