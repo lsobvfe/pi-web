@@ -1,5 +1,5 @@
 "use client";
-import { piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { usePiWebNavigation } from "@/hooks/usePiWebNavigation";
@@ -63,6 +63,7 @@ const TOP_BAR_ICON_BUTTON_SIZE = 36;
 const LANGUAGE_MENU_WIDTH = 176;
 
 export function AppShell() {
+  const { request: piWebFetch } = usePiWebClient();
   const { replace: replaceUrl, searchParams } = usePiWebNavigation();
   const [initialNavigation] = useState(() => getInitialNavigation(searchParams));
   const { preference, toggleTheme } = useTheme();

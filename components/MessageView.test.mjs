@@ -15,13 +15,27 @@ const {
   replaceUserMessageText,
 } = await jiti.import("./MessageView.tsx");
 const { I18nProvider } = await jiti.import("../hooks/useI18n.tsx");
+const { PiWebHostProvider } = await jiti.import("../embedded/PiWebHost.tsx");
+
+const testHost = {
+  async request() {
+    throw new Error("UNEXPECTED_TEST_REQUEST");
+  },
+  eventSource() {
+    throw new Error("UNEXPECTED_TEST_EVENT_SOURCE");
+  },
+};
 
 function renderMessage(message, props = {}) {
   return renderToStaticMarkup(
     React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(MessageView, { message, ...props }),
+      PiWebHostProvider,
+      { host: testHost },
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(MessageView, { message, ...props }),
+      ),
     ),
   );
 }

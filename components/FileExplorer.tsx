@@ -1,5 +1,9 @@
 "use client";
-import { piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
+import {
+  usePiWebClient,
+  usePiWebResourceUrl,
+  type PiWebHost,
+} from "../embedded/PiWebHost";
 
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { getFileIcon, FolderIcon } from "./FileIcons";
@@ -84,9 +88,12 @@ interface PendingConflict {
   nonReplaceable: string[];
 }
 
-async function fetchEntries(dirPath: string): Promise<FileNode[]> {
+async function fetchEntries(
+  request: PiWebHost["request"],
+  dirPath: string,
+): Promise<FileNode[]> {
   const encoded = encodeFilePathForApi(dirPath);
-  const res = await piWebFetch(`/api/files/${encoded}?type=list`);
+  const res = await request(`/api/files/${encoded}?type=list`);
   if (!res.ok) {
     let message = `Failed to load files (HTTP ${res.status})`;
     try {
@@ -108,9 +115,12 @@ async function fetchEntries(dirPath: string): Promise<FileNode[]> {
   }));
 }
 
-async function fetchGitStatus(cwd: string): Promise<GitStatusResponse> {
+async function fetchGitStatus(
+  request: PiWebHost["request"],
+  cwd: string,
+): Promise<GitStatusResponse> {
   const params = new URLSearchParams({ cwd });
-  const res = await piWebFetch(`/api/git/status?${params.toString()}`);
+  const res = await request(`/api/git/status?${params.toString()}`);
   if (!res.ok) throw new Error(`Failed to load Git status (HTTP ${res.status})`);
   return res.json() as Promise<GitStatusResponse>;
 }
@@ -157,6 +167,7 @@ function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) 
 }
 
 function uploadFiles(
+  request: PiWebHost["request"],
   targetDirectory: string,
   files: File[],
   strategy: UploadConflictStrategy,
@@ -164,7 +175,7 @@ function uploadFiles(
 ): Promise<{ status: number; data: UploadResponse }> {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file, file.name));
-  return piWebFetch(
+  return request(
     `/api/files/${encodeFilePathForApi(targetDirectory)}?type=upload&conflict=${strategy}`,
     { method: "POST", body: formData },
   ).then(async (response) => {
@@ -229,6 +240,7 @@ function TreeNode({
   changedDirectoryPaths: Set<string>;
   t: Translate;
 }) {
+  const { request } = usePiWebClient();
   const open = expandedPaths.has(node.fullPath);
   const highlighted = highlightedPaths.has(node.fullPath);
   const normalizedPath = normalizeFilePathSlashes(node.fullPath);
@@ -245,7 +257,7 @@ function TreeNode({
     if (loaded && !force) return;
     setLoading(true);
     try {
-      const entries = await fetchEntries(node.fullPath);
+      const entries = await fetchEntries(request, node.fullPath);
       setChildren(entries);
       setLoaded(true);
     } catch {
@@ -253,7 +265,7 @@ function TreeNode({
     } finally {
       setLoading(false);
     }
-  }, [loaded, node.fullPath]);
+  }, [loaded, node.fullPath, request]);
 
   // Re-fetch children when the tree refreshes and the directory is open.
   useEffect(() => {
@@ -517,6 +529,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
   changesCollapsed,
   onChangesCountChange,
 }, ref) {
+  const { request: piWebFetch } = usePiWebClient();
   const { t } = useI18n();
   const [roots, setRoots] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -586,7 +599,13 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     setUploadPhase("uploading");
 
     try {
-      const { status, data } = await uploadFiles(cwd, files, strategy, setUploadProgress);
+      const { status, data } = await uploadFiles(
+        piWebFetch,
+        cwd,
+        files,
+        strategy,
+        setUploadProgress,
+      );
       if (status === 409 && data.conflicts?.length) {
         setPendingConflict({
           files,
@@ -679,7 +698,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     setLoading(cwdChanged);
     setError(null);
     let cancelled = false;
-    fetchEntries(cwd)
+    fetchEntries(piWebFetch, cwd)
       .then((entries) => { if (!cancelled) setRoots(entries); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -688,7 +707,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
 
   useEffect(() => {
     let cancelled = false;
-    fetchGitStatus(cwd)
+    fetchGitStatus(piWebFetch, cwd)
       .then((status) => {
         if (!cancelled) {
           setGitFiles(status.isGitRepository ? status.files : []);

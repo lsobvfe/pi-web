@@ -11,6 +11,30 @@ const jiti = createJiti(import.meta.url, {
 const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, canRestoreUserMessage, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages } = await jiti.import("./ChatInput.tsx");
 const { clearDraft, getDraft, mergeRestoredSubmissionDraft, mergeRestoredSubmissionText, rekeyDraft, setDraft } = await jiti.import("../lib/draft-store.ts");
 const { I18nProvider } = await jiti.import("../hooks/useI18n.tsx");
+const { PiWebHostProvider } = await jiti.import("../embedded/PiWebHost.tsx");
+
+const testHost = {
+  async request() {
+    throw new Error("UNEXPECTED_TEST_REQUEST");
+  },
+  eventSource() {
+    throw new Error("UNEXPECTED_TEST_EVENT_SOURCE");
+  },
+};
+
+function renderChatInput(props) {
+  return renderToStaticMarkup(
+    React.createElement(
+      PiWebHostProvider,
+      { host: testHost },
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(ChatInput, props),
+      ),
+    ),
+  );
+}
 
 test("renders the upstream model error", () => {
   const html = renderToStaticMarkup(
@@ -41,61 +65,43 @@ test("renders enabledModels scope warnings", () => {
 });
 
 test("keeps the model selector visible when a model error leaves no options", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onModelChange() {},
-        isStreaming: false,
-        modelError: "Invalid models.json schema",
-        modelList: [],
-        modelNames: {},
-      }),
-    ),
-  );
+  const html = renderChatInput({
+    onSend() {},
+    onAbort() {},
+    onModelChange() {},
+    isStreaming: false,
+    modelError: "Invalid models.json schema",
+    modelList: [],
+    modelNames: {},
+  });
 
   assert.match(html, />No models</);
   assert.match(html, /title="No available models"/);
 });
 
 test("renders the read-only tool preset as the active selection", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onToolPresetChange() {},
-        isStreaming: false,
-        toolPreset: "read-only",
-      }),
-    ),
-  );
+  const html = renderChatInput({
+    onSend() {},
+    onAbort() {},
+    onToolPresetChange() {},
+    isStreaming: false,
+    toolPreset: "read-only",
+  });
 
   assert.match(html, /title="Change tool preset: read-only"/);
   assert.match(html, />read-only<\/span>/);
 });
 
 test("shows and locks the optimistic model while a switch is pending", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onModelChange() {},
-        isStreaming: false,
-        model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
-        modelList: [{ provider: "deepseek", id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
-        modelSwitching: true,
-      }),
-    ),
-  );
+  const html = renderChatInput({
+    onSend() {},
+    onAbort() {},
+    onModelChange() {},
+    isStreaming: false,
+    model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
+    modelList: [{ provider: "deepseek", id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
+    modelSwitching: true,
+  });
 
   assert.match(html, /title="Switching model"/);
   assert.match(html, /aria-busy="true"/);
@@ -250,19 +256,13 @@ test("rekey keeps a synchronously restored draft when React state is still empty
 
 test("renders compact errors above the input as a wrapping alert", () => {
   const error = "Compaction failed: OpenAI API error (403): <html>request forbidden</html>";
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onCompact() {},
-        isStreaming: false,
-        compactError: error,
-      }),
-    ),
-  );
+  const html = renderChatInput({
+    onSend() {},
+    onAbort() {},
+    onCompact() {},
+    isStreaming: false,
+    compactError: error,
+  });
 
   assert.match(html, /role="alert"/);
   assert.match(html, /Compaction failed: OpenAI API error/);

@@ -1,5 +1,5 @@
 "use client";
-import { piWebEventSource, piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
+import { usePiWebClient, usePiWebResourceUrl } from "../embedded/PiWebHost";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
 import {
@@ -430,6 +430,7 @@ function DiffView({ patch }: { patch: string }) {
 }
 
 function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Props) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
   const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
@@ -603,6 +604,7 @@ function formatDuration(seconds: number): string {
 }
 
 function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Props) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
   const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
@@ -757,6 +759,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 }
 
 function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Props) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
   const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
@@ -981,6 +984,7 @@ function TextFileViewer({
   onStateChange,
   watchEnabled = true,
 }: Props) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
   const { isDark } = useTheme();
   const { t } = useI18n();
   const [data, setData] = useState<FileData | null>(null);

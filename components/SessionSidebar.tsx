@@ -1,5 +1,5 @@
 "use client";
-import { piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { SessionInfo } from "@/lib/types";
@@ -400,6 +400,7 @@ function PiWebTitle() {
 }
 
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange }: Props) {
+  const { request: piWebFetch } = usePiWebClient();
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -705,7 +706,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // Load worktrees for the current effective cwd
   const [wtRefreshKey, setWtRefreshKey] = useState(0);
   useLayoutEffect(() => {
-    if (!selectedCwd) {
+    if (!selectedCwd || !runtimeMode || runtimeMode.managed) {
       setWorktreeState(null);
       setWorktreeLoadingCwd(null);
       return;
@@ -736,9 +737,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           setWorktreeLoadingCwd(null);
           setWorktreeState(null);
         }
-      });
+    });
     return () => { cancelled = true; };
-  }, [selectedCwd, wtRefreshKey, refreshKey]);
+  }, [runtimeMode, selectedCwd, wtRefreshKey, refreshKey]);
 
   // Auto-select cwd and restore session from URL on first load
   useEffect(() => {
@@ -2026,6 +2027,7 @@ function SessionItem({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);

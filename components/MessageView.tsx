@@ -1,5 +1,9 @@
 "use client";
-import { piWebFetch, usePiWebResourceUrl } from "../lib/embedded-host";
+import {
+  usePiWebClient,
+  usePiWebResourceUrl,
+  type PiWebHost,
+} from "../embedded/PiWebHost";
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import { MarkdownBody } from "./MarkdownBody";
@@ -147,7 +151,12 @@ function SafeMarkdownBody({ children, className, ...props }: React.ComponentProp
 // push the conversation off screen; overflow scrolls inside the bubble.
 const USER_BUBBLE_MAX_HEIGHT = 300;
 
-function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
+function loadThinkingContent(
+  request: PiWebHost["request"],
+  sessionId: string,
+  entryId: string,
+  blockIndex: number,
+): Promise<string> {
   const key = `${sessionId}:${entryId}:${blockIndex}`;
   const cached = thinkingContentCache.get(key);
   if (cached) {
@@ -156,7 +165,7 @@ function loadThinkingContent(sessionId: string, entryId: string, blockIndex: num
     return cached;
   }
 
-  const request = piWebFetch(
+  const pending = request(
     `/api/sessions/${encodeURIComponent(sessionId)}/entries/${encodeURIComponent(entryId)}/thinking?blockIndex=${blockIndex}`,
   ).then(async (response) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -168,12 +177,12 @@ function loadThinkingContent(sessionId: string, entryId: string, blockIndex: num
     throw error;
   });
 
-  thinkingContentCache.set(key, request);
+  thinkingContentCache.set(key, pending);
   if (thinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
     const oldestKey = thinkingContentCache.keys().next().value;
     if (oldestKey) thinkingContentCache.delete(oldestKey);
   }
-  return request;
+  return pending;
 }
 
 interface Props {
@@ -592,6 +601,7 @@ function AssistantMessageView({
   entryId?: string;
   writtenFiles?: WrittenFile[];
 }) {
+  const { request } = usePiWebClient();
   const { t } = useI18n();
   const time = showTimestamp ? formatTime(message.timestamp) : null;
   const blockItems = useMemo(() => (message.content ?? [])
@@ -873,6 +883,7 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
   entryId?: string;
   blockIndex: number;
 }) {
+  const { request } = usePiWebClient();
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState<string | null>(null);
@@ -891,7 +902,7 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
     setLoading(true);
     setError(null);
     try {
-      setContent(await loadThinkingContent(sessionId, entryId, blockIndex));
+      setContent(await loadThinkingContent(request, sessionId, entryId, blockIndex));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1642,6 +1653,7 @@ function formatUsage(usage: {
 }
 
 function BashExecutionView({ message, sessionId }: { message: BashExecutionMessage; sessionId?: string }) {
+  const { request: piWebFetch } = usePiWebClient();
   const [fullOutput, setFullOutput] = useState<string | null>(null);
   const [loadingFull, setLoadingFull] = useState(false);
   const [fullError, setFullError] = useState<string | null>(null);

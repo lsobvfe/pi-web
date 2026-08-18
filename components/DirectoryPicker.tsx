@@ -1,5 +1,5 @@
 "use client";
-import { piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient, type PiWebHost } from "../embedded/PiWebHost";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -18,9 +18,12 @@ interface BrowseResponse {
   error?: string;
 }
 
-async function loadDirectories(directory?: string): Promise<BrowseResponse> {
+async function loadDirectories(
+  request: PiWebHost["request"],
+  directory?: string,
+): Promise<BrowseResponse> {
   const query = directory ? `?path=${encodeURIComponent(directory)}` : "";
-  const response = await piWebFetch(`/api/cwd/browse${query}`);
+  const response = await request(`/api/cwd/browse${query}`);
   const data = await response.json() as BrowseResponse;
   if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
   return data;
@@ -56,6 +59,7 @@ interface Props {
 }
 
 export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Props) {
+  const { request } = usePiWebClient();
   const { t } = useI18n();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [currentPath, setCurrentPath] = useState("");
@@ -70,7 +74,7 @@ export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Pro
     setLoading(true);
     setLoadError(null);
     try {
-      const data = await loadDirectories(directory);
+      const data = await loadDirectories(request, directory);
       const nextPath = data.path ?? directory ?? "/";
       setCurrentPath(nextPath);
       setParentDirectory(data.parentPath ?? null);
@@ -82,7 +86,7 @@ export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Pro
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [request]);
 
   useEffect(() => {
     setPortalTarget(document.body);

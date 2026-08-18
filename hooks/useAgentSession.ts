@@ -1,5 +1,5 @@
 "use client";
-import { piWebEventSource, piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, useReducer } from "react";
 import type {
@@ -14,7 +14,10 @@ import type {
 } from "@/lib/types";
 import { isBlockingExtensionUiRequest } from "@/lib/browser-notifications";
 import { normalizeToolCalls } from "@/lib/normalize";
-import { isPromptRejectedError, sendAgentCommand } from "@/lib/agent-client";
+import {
+  isPromptRejectedError,
+  sendAgentCommand as sendAgentCommandWithRequest,
+} from "@/lib/agent-client";
 import { clearDraft, rekeyDraft, restoreDraftSubmission } from "@/lib/draft-store";
 import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
 import { getToolNamesForPreset, type ToolEntry, type ToolPreset } from "@/lib/tool-presets";
@@ -263,6 +266,13 @@ type SlashCommandsResponse = {
 };
 
 export function useAgentSession(opts: UseAgentSessionOptions) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
+  const sendAgentCommand = useCallback(
+    <T,>(sessionId: string, command: Record<string, unknown>) => (
+      sendAgentCommandWithRequest<T>(piWebFetch, sessionId, command)
+    ),
+    [piWebFetch],
+  );
   const {
     session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemPromptLoaderChange, onSessionStatsPanelOpen,

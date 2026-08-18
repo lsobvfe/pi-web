@@ -1,5 +1,5 @@
 "use client";
-import { piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -375,6 +375,7 @@ function AddSkillPanel({
   projectResourcesLoaded: boolean;
   onInstalled: () => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkillSearchResult[]>([]);
@@ -714,6 +715,7 @@ export function SkillsConfig({
   cwd: string;
   onClose: () => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const isMobile = useIsMobile();
   const { t } = useI18n();
   const [skills, setSkills] = useState<Skill[]>([]);

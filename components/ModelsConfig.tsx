@@ -1,5 +1,5 @@
 "use client";
-import { piWebEventSource, piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -325,6 +325,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
   onChange: (p: ProviderEntry) => void; onRename: (n: string) => void; onDelete: () => void;
   onAddModels: (models: DiscoveredModel[]) => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const { t } = useI18n();
   const [editingName, setEditingName] = useState(name);
   const [discoveryState, setDiscoveryState] = useState<ModelDiscoveryState>({ phase: "idle" });
@@ -843,6 +844,7 @@ function ModelDetail({
   onChange: (m: ModelEntry) => void;
   onDelete: () => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
   const { t } = useI18n();
   const [catalogState, setCatalogState] = useState<ModelCatalogState>({ phase: "idle" });
@@ -1325,6 +1327,7 @@ function ModelDetail({
 // ── OAuth detail ──────────────────────────────────────────────────────────────
 
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
+  const { request: piWebFetch, eventSource: piWebEventSource } = usePiWebClient();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const { t } = useI18n();
   const [inputValue, setInputValue] = useState("");
@@ -1585,6 +1588,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 // ── API Key detail ────────────────────────────────────────────────────────────
 
 function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRefresh: () => void }) {
+  const { request: piWebFetch } = usePiWebClient();
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -1893,6 +1897,7 @@ function AddProviderPicker({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ModelsConfig({ onClose }: { onClose: () => void }) {
+  const { request: piWebFetch } = usePiWebClient();
   const isMobile = useIsMobile();
   const { t } = useI18n();
   const [config, setConfig] = useState<ModelsJson>({ providers: {} });

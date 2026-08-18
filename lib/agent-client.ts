@@ -1,4 +1,4 @@
-import { piWebFetch } from "./embedded-host";
+import type { PiWebHost } from "../embedded/PiWebHost";
 // Client-side helper for POST /api/agent/[id].
 //
 // Every /api/agent/[id] route returns one of:
@@ -27,10 +27,11 @@ export function isPromptRejectedError(error: unknown): error is AgentCommandErro
 }
 
 export async function sendAgentCommand<T = unknown>(
+  request: PiWebHost["request"],
   sessionId: string,
   command: Record<string, unknown>,
 ): Promise<T> {
-  const res = await piWebFetch(`/api/agent/${encodeURIComponent(sessionId)}`, {
+  const res = await request(`/api/agent/${encodeURIComponent(sessionId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(command),

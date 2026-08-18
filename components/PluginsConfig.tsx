@@ -1,5 +1,5 @@
 "use client";
-import { piWebFetch } from "../lib/embedded-host";
+import { usePiWebClient } from "../embedded/PiWebHost";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -624,6 +624,7 @@ export function PluginsConfig({
   onClose: () => void;
   onReloaded?: () => void;
 }) {
+  const { request: piWebFetch } = usePiWebClient();
   const isMobile = useIsMobile();
   const { t } = useI18n();
   const [data, setData] = useState<PluginsResponse | null>(null);
@@ -740,7 +741,7 @@ export function PluginsConfig({
     setActionError(null);
     setActionMessage(null);
     try {
-      await sendAgentCommand(sessionId, { type: "reload" });
+      await sendAgentCommand(piWebFetch, sessionId, { type: "reload" });
       onReloaded?.();
       await loadPlugins();
       setActionMessage("Session reloaded.");

@@ -75,5 +75,6 @@ test("managed mode selects the server-provided workspace and never enables direc
   assert.match(source, /disabled=\{!runtimeMode \|\| !runtimeMode\.directorySelectionEnabled\}/);
   assert.match(source, /runtimeMode\?\.directorySelectionEnabled && customPathOpen/);
   assert.match(source, /runtimeMode\?\.directorySelectionEnabled[\s\S]*?worktreeState\?\.isGit/);
+  assert.match(source, /if \(!selectedCwd \|\| !runtimeMode \|\| runtimeMode\.managed\) \{/);
   assert.doesNotMatch(source, /NEXT_PUBLIC_PI_WEB_MANAGED/);
 });
