@@ -65,11 +65,9 @@ export function readModelsConfig(
   modelsPath = getModelsConfigPath(),
 ): Record<string, unknown> {
   if (!existsSync(modelsPath)) return { providers: {} };
-  try {
-    return JSON.parse(readFileSync(modelsPath, "utf8")) as Record<string, unknown>;
-  } catch {
-    return { providers: {} };
-  }
+  const value = JSON.parse(readFileSync(modelsPath, "utf8")) as unknown;
+  if (!isRecord(value)) throw new Error("PI_MODELS_CONFIG_INVALID");
+  return value;
 }
 
 export function writeModelsConfig(
