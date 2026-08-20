@@ -10,7 +10,9 @@ import {
 import { getRpcSession } from "@/lib/rpc-manager";
 import { projectTreeForResponse } from "@/lib/project-tree";
 import { computeSessionTotalActiveMs } from "@/lib/session-timing";
-import { trashSession } from "@/lib/session-lifecycle";
+import { restoreSession, trashSession } from "@/lib/session-lifecycle";
+import { readCommandOsSessionMetadata } from "@/lib/command-os-session-metadata";
+import { publicManagedPath } from "@/lib/managed-mode";
 
 export async function GET(
   req: Request,
@@ -43,7 +45,7 @@ export async function GET(
       ? await resolveSessionIdByPath(header.parentSession)
       : undefined;
     const info = header ? {
-      path: filePath,
+      path: publicManagedPath(filePath),
       id: header.id,
       cwd: header.cwd ?? "",
       name: sm.getSessionName(),
@@ -59,11 +61,12 @@ export async function GET(
         : "(no messages)",
       parentSessionId,
       transient: !filePath || !existsSync(filePath),
+      metadata: readCommandOsSessionMetadata(filePath),
     } : null;
 
     return NextResponse.json({
       sessionId: id,
-      filePath,
+      filePath: publicManagedPath(filePath),
       info,
       leafId,
       tree,
@@ -107,6 +110,20 @@ export async function DELETE(
   const { id } = await params;
   try {
     await trashSession(id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
+// POST /api/sessions/[id]/restore
+export async function POST(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    restoreSession(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

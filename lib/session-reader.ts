@@ -12,17 +12,10 @@ import { normalizeToolCalls } from "./normalize";
 import { projectIdentityKey } from "./project-identity";
 import { sessionPathKey } from "./session-path";
 import { resolveProject, type ProjectInfo } from "./worktree";
+import { readCommandOsSessionMetadata } from "./command-os-session-metadata";
+import { publicManagedPath } from "./managed-mode";
 
 export { getAgentDir };
-
-const sessionCustomData = new WeakMap<SessionInfo, Record<string, unknown>>();
-
-export function getSessionCustomData(
-  session: SessionInfo,
-  customType: string,
-): unknown {
-  return sessionCustomData.get(session)?.[customType];
-}
 
 export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise<SessionInfo[]> {
   const uniqueCwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
@@ -62,7 +55,7 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
   const sessions = piSessions.map((s) => {
     cacheSessionPath(s.id, s.path);
     return {
-      path: s.path,
+      path: publicManagedPath(s.path),
       id: s.id,
       cwd: s.cwd,
       name: s.name,
@@ -72,12 +65,10 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: s.parentSessionPath ? pathToId.get(sessionPathKey(s.parentSessionPath)) : undefined,
       transient: false,
+      metadata: readCommandOsSessionMetadata(s.path),
     };
   });
   const attached = await attachSessionProjectInfo(sessions);
-  attached.forEach((session, index) => {
-    sessionCustomData.set(session, piSessions[index]?.customData ?? {});
-  });
   return attached;
 }
 

@@ -5,6 +5,7 @@ import path from "path";
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { loadSkillsWithInstallInfo } from "@/lib/skills-service";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
+import { publicManagedPath, resolveManagedPath } from "@/lib/managed-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,15 @@ export async function GET(req: Request) {
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
-    return NextResponse.json(await loadSkillsWithInstallInfo(cwd));
+    const payload = await loadSkillsWithInstallInfo(cwd);
+    return NextResponse.json({
+      ...payload,
+      skills: payload.skills.map((skill) => ({
+        ...skill,
+        filePath: publicManagedPath(skill.filePath),
+        baseDir: publicManagedPath(skill.baseDir),
+      })),
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
@@ -31,7 +40,8 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json() as { filePath: string; disableModelInvocation: boolean };
-    const { filePath, disableModelInvocation } = body;
+    const filePath = resolveManagedPath(body.filePath);
+    const { disableModelInvocation } = body;
     if (!filePath) return NextResponse.json({ error: "filePath required" }, { status: 400 });
     if (!existsSync(filePath)) return NextResponse.json({ error: "file not found" }, { status: 404 });
     const allowedRoots = new Set(await getAllowedFileRoots());

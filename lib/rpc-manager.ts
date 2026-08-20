@@ -2,10 +2,20 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, SettingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { randomUUID } from "crypto";
-import { existsSync, realpathSync } from "fs";
+import { existsSync, realpathSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import {
+  cancelActiveCommandOsTurn,
+  cancelCommandOsTurn,
+  createCommandOsContextExtension,
+  getPreparedCommandOsTurn,
+  prepareCommandOsTurn,
+  startCommandOsTurn,
+  type CommandOsTurnContext,
+} from "./command-os-turn-context";
 import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
+import { publicRuntimeErrorMessage } from "./public-runtime-error";
 import { assertRuntimeWorkspaceCwd } from "./managed-mode";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
 import {
@@ -370,7 +380,13 @@ export class AgentSessionWrapper {
     const manager = this.inner.sessionManager;
     const sessionFile = manager.getSessionFile();
     if (!sessionFile || existsSync(sessionFile)) return;
-    manager.flush();
+    const header = manager.getHeader();
+    if (!header) return;
+    const content = [header, ...manager.getEntries()]
+      .map((entry) => JSON.stringify(entry))
+      .join("\n") + "\n";
+    writeFileSync(sessionFile, content, { encoding: "utf8", flag: "wx" });
+    (manager as unknown as { flushed: boolean }).flushed = true;
     cacheSessionPath(this.inner.sessionId, sessionFile);
   }
 
@@ -385,6 +401,55 @@ export class AgentSessionWrapper {
 
   onDestroy(cb: () => void): void {
     this.onDestroyCallback = cb;
+  }
+
+  prepareCommandOsTurn(context: CommandOsTurnContext): string {
+    return prepareCommandOsTurn(this.inner.sessionId, context);
+  }
+
+  setCommandOsMetadata(metadata: Record<string, unknown>): void {
+    this.inner.sessionManager.appendCustomEntry("command_os.session_metadata", metadata);
+    invalidateSessionListCache();
+  }
+
+  async startCommandOsTurn(turnId: string): Promise<void> {
+    const command = getPreparedCommandOsTurn(this.inner.sessionId, turnId);
+    let activated = false;
+    try {
+      if (command.provider || command.modelId) {
+        if (!command.provider || !command.modelId) {
+          throw new Error("PI_RUNTIME_MODEL_REFERENCE_INVALID");
+        }
+        await this.send({
+          type: "set_model",
+          provider: command.provider,
+          modelId: command.modelId,
+        });
+      }
+      if (command.thinkingLevel) {
+        await this.send({
+          type: "set_thinking_level",
+          level: command.thinkingLevel,
+        });
+      }
+      if (command.parentMessageId) {
+        const navigation = await this.inner.navigateTree(command.parentMessageId, {});
+        if (navigation.cancelled) {
+          throw new Error("PI_COMMAND_OS_PARENT_MESSAGE_NOT_FOUND");
+        }
+      }
+      startCommandOsTurn(this.inner.sessionId, turnId);
+      activated = true;
+      await this.send({
+        type: "prompt",
+        message: command.message,
+        ...(command.images?.length ? { images: command.images } : {}),
+      });
+    } catch (error) {
+      if (activated) cancelActiveCommandOsTurn(this.inner.sessionId);
+      else cancelCommandOsTurn(this.inner.sessionId, turnId);
+      throw error;
+    }
   }
 
   async send(command: Record<string, unknown>): Promise<unknown> {
@@ -409,12 +474,6 @@ export class AgentSessionWrapper {
           }
           const promptImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
           const streamingBehavior = command.streamingBehavior as "steer" | "followUp" | undefined;
-          const contextMessages = Array.isArray(command.contextMessages)
-            ? command.contextMessages
-            : undefined;
-          const systemPrompt = typeof command.systemPrompt === "string"
-            ? command.systemPrompt
-            : undefined;
           let preflightAccepted = false;
           let preflightSettled = false;
           let promptSettled = false;
@@ -448,8 +507,6 @@ export class AgentSessionWrapper {
             prompt = this.inner.prompt(command.message as string, {
               ...(promptImages?.length ? { images: promptImages } : {}),
               ...(streamingBehavior ? { streamingBehavior } : {}),
-              ...(contextMessages?.length ? { contextMessages } : {}),
-              ...(systemPrompt !== undefined ? { systemPrompt } : {}),
               source: "rpc",
               // Match pi's RPC contract: acknowledge only after synchronous prompt
               // validation and extension preflight have accepted the submission.
@@ -474,7 +531,7 @@ export class AgentSessionWrapper {
             if (preflightAccepted) {
               this.emit({
                 type: "prompt_error",
-                errorMessage: error instanceof Error ? error.message : String(error),
+                errorMessage: publicRuntimeErrorMessage(error),
               });
               if (!streamingBehavior) this.emit({ type: "prompt_done" });
             }
@@ -560,7 +617,6 @@ export class AgentSessionWrapper {
           // Fork before the first message: create an empty session linked to this one
           const newManager = SessionManager.create(sessionManager.getCwd(), sessionDir);
           newManager.newSession({ parentSession: currentSessionFile });
-          newManager.flush();
           newSessionFile = newManager.getSessionFile() as string;
         } else {
           // Fork after some history: copy path up to (but not including) the fork point
@@ -613,6 +669,15 @@ export class AgentSessionWrapper {
         if (!name) throw new Error("Session name cannot be empty");
         this.inner.setSessionName(name);
         invalidateSessionListCache();
+        return null;
+      }
+
+      case "set_command_os_metadata": {
+        const metadata = command.metadata;
+        if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+          throw new Error("PI_COMMAND_OS_SESSION_METADATA_INVALID");
+        }
+        this.setCommandOsMetadata(metadata as Record<string, unknown>);
         return null;
       }
 
@@ -1616,6 +1681,7 @@ export async function startRpcSession(
             cwd: sessionCwd,
             settings: settingsManager,
           }),
+          createCommandOsContextExtension(),
         ],
         extensionsOverride: preferUserBashExtension,
       },

@@ -1,4 +1,4 @@
-import { resolve } from "path";
+import { relative, resolve } from "path";
 
 const MANAGED_MODE = "1";
 
@@ -37,4 +37,30 @@ export function assertRuntimeWorkspaceCwd(
     throw new Error("PI_WEB_MANAGED_WORKSPACE_REQUIRED");
   }
   return resolved;
+}
+
+export function publicManagedPath(
+  candidate: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (!isManagedMode(env)) return candidate;
+  const normalized = resolve(candidate);
+  if (normalized === managedWorkspaceRoot(env)) return "/mnt/project";
+  if (normalized === "/mnt/home") return "~";
+  if (normalized.startsWith("/mnt/home/")) return `~/${relative("/mnt/home", normalized)}`;
+  if (normalized.startsWith(`${managedWorkspaceRoot(env)}/`)) {
+    return `/mnt/project/${relative(managedWorkspaceRoot(env), normalized)}`;
+  }
+  return "";
+}
+
+export function resolveManagedPath(
+  candidate: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (!isManagedMode(env)) return resolve(candidate);
+  const value = candidate.trim();
+  if (value === "~") return "/mnt/home";
+  if (value.startsWith("~/")) return resolve("/mnt/home", value.slice(2));
+  return assertManagedWorkspacePath(value, env);
 }

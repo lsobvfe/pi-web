@@ -5,12 +5,12 @@ import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import {
   loadModelsWithCache,
   withModelRuntimeError,
-  withSafeModelLoadFailure,
   type ModelsData,
 } from "@/lib/models-cache";
 import { resolveVisibleModels, selectInitialModelScope } from "@/lib/model-scope";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 import { projectTrustReloadOptions } from "@/lib/project-trust";
+import { assertRuntimeWorkspaceCwd, isManagedMode } from "@/lib/managed-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -88,18 +88,14 @@ async function loadModels(cwd: string): Promise<ModelsData> {
   );
 }
 
-const EMPTY_MODELS: ModelsData = {
-  models: {},
-  modelList: [],
-  defaultModel: null,
-  thinkingLevels: {},
-  thinkingLevelMaps: {},
-  thinkingLevelPins: {},
-};
-
 export async function GET(req: Request) {
   const requestedCwd = new URL(req.url).searchParams.get("cwd") || process.cwd();
-  const cwd = resolve(requestedCwd);
+  let cwd: string;
+  try {
+    cwd = isManagedMode() ? assertRuntimeWorkspaceCwd(requestedCwd) : resolve(requestedCwd);
+  } catch {
+    return Response.json({ error: "PI_WEB_MANAGED_WORKSPACE_REQUIRED" }, { status: 403 });
+  }
 
   let cwdStat;
   try {
@@ -118,6 +114,6 @@ export async function GET(req: Request) {
   try {
     return Response.json(await loadModelsWithCache(cwd, () => loadModels(cwd)));
   } catch {
-    return Response.json(withSafeModelLoadFailure(EMPTY_MODELS));
+    return Response.json({ error: "PI_MODELS_UNAVAILABLE" }, { status: 503 });
   }
 }

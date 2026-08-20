@@ -11,6 +11,7 @@ export async function GET(
 ) {
   const { id } = await params;
   if (req.signal.aborted) return new Response(null, { status: 204 });
+  const turnId = new URL(req.url).searchParams.get("commandOsTurnId")?.trim() || null;
 
   // Fast path: already-running session
   const session = getRpcSession(id);
@@ -26,7 +27,19 @@ export async function GET(
     sessionPromise = startRpcSession(id, filePath, undefined).then((result) => result.session);
   }
 
-  const stream = createAgentEventStream(req, id, sessionPromise);
+  const stream = createAgentEventStream(
+    req,
+    id,
+    sessionPromise,
+    turnId
+      ? async (started) => {
+          if (!started.startCommandOsTurn) {
+            throw new Error("PI_COMMAND_OS_TURN_UNSUPPORTED");
+          }
+          await started.startCommandOsTurn(turnId);
+        }
+      : undefined,
+  );
 
   return new Response(stream, {
     headers: {

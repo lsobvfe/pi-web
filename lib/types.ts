@@ -318,6 +318,7 @@ export interface SessionInfo {
   /** True while the runtime session exists only in memory and its JSONL file
    *  has not been created yet. Disk-backed actions must wait until this clears. */
   transient?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionContext {

@@ -3,18 +3,16 @@ import {
   toClientAgentEvent,
   type AgentEventLike,
 } from "./agent-event-wire";
+import { publicRuntimeErrorMessage } from "./public-runtime-error";
 
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
   readonly streamingMessage: unknown;
   onEvent(listener: (event: AgentEventLike) => void): () => void;
+  startCommandOsTurn?(turnId: string): Promise<void>;
 }
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /**
  * Open the SSE transport immediately, then publish the session snapshot only
@@ -24,6 +22,7 @@ export function createAgentEventStream(
   req: Request,
   sessionId: string,
   sessionPromise: Promise<AgentEventStreamSession>,
+  startTurn?: (session: AgentEventStreamSession) => Promise<void>,
 ): ReadableStream<Uint8Array> {
   let cancelStream: (closeController: boolean) => void = () => {};
 
@@ -86,6 +85,7 @@ export function createAgentEventStream(
             return;
           }
           unsubscribe = stopListening;
+          if (startTurn) await startTurn(session);
 
           const snapshot = session.streamingMessage;
           encode({
@@ -102,7 +102,7 @@ export function createAgentEventStream(
           if (closed) return;
           encode({
             type: "startup_error",
-            errorMessage: `Failed to start agent: ${errorMessage(error)}`,
+            errorMessage: publicRuntimeErrorMessage(error),
           });
           cleanup(true);
         }
