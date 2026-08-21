@@ -14,9 +14,10 @@ import {
   type CommandOsTurnContext,
 } from "./command-os-turn-context";
 import { validateAgentImages } from "./image-attachments";
+import { createManagedProviderIdentityExtension } from "./managed-provider-identity";
 import { invalidateModelsCache } from "./models-cache";
 import { publicRuntimeErrorMessage } from "./public-runtime-error";
-import { assertRuntimeWorkspaceCwd } from "./managed-mode";
+import { assertRuntimeWorkspaceCwd, isManagedMode } from "./managed-mode";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
 import {
   createProjectCommandBashExtension,
@@ -1682,6 +1683,7 @@ export async function startRpcSession(
             settings: settingsManager,
           }),
           createCommandOsContextExtension(),
+          ...(isManagedMode() ? [createManagedProviderIdentityExtension()] : []),
         ],
         extensionsOverride: preferUserBashExtension,
       },
