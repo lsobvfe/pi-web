@@ -95,7 +95,14 @@ export function createRuntimeTurnStream(
             return;
           }
           if (event.type === "prompt_done") {
-            emit("message_complete", completedMessage(session));
+            const completed = completedMessage(session);
+            const metadata = record(completed.metadata);
+            const failure = text(metadata.errorMessage, "");
+            if (failure) {
+              finishWithError(failure);
+              return;
+            }
+            emit("message_complete", completed);
             emit("done", {});
             cleanup(true);
           }

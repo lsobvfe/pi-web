@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readCommandOsSettings, writeCommandOsSettings } from "@/lib/command-os-settings";
+import { invalidateModelsCache } from "@/lib/models-cache";
 
 export function GET() {
   try {
@@ -14,9 +15,9 @@ export function GET() {
 export async function PUT(req: Request) {
   try {
     const body = await req.json() as { settings?: unknown };
-    return NextResponse.json({
-      settings: await writeCommandOsSettings(body.settings),
-    });
+    const settings = await writeCommandOsSettings(body.settings);
+    invalidateModelsCache();
+    return NextResponse.json({ settings });
   } catch (error) {
     return NextResponse.json({ error: errorCode(error) }, { status: 400 });
   }
