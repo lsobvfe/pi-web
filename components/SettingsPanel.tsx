@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { usePiWebClient } from "../embedded/PiWebHost";
 import { useI18n } from "@/hooks/useI18n";
 import { useTheme, type ThemePreference } from "@/hooks/useTheme";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -54,6 +55,7 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
 }
 
 function GeneralSettings({ sessionId, onSessionReloaded }: Pick<Props, "sessionId" | "onSessionReloaded">) {
+  const { request: piWebFetch } = usePiWebClient();
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const [shellSettings, setShellSettings] = useState<ShellToolSettingsResponse | null>(null);
@@ -67,7 +69,7 @@ function GeneralSettings({ sessionId, onSessionReloaded }: Pick<Props, "sessionI
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/tools/settings")
+    void piWebFetch("/api/tools/settings")
       .then(async (response) => {
         const data = await response.json() as ShellToolSettingsResponse & { error?: string };
         if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
@@ -77,13 +79,13 @@ function GeneralSettings({ sessionId, onSessionReloaded }: Pick<Props, "sessionI
         if (!cancelled) setShellError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [piWebFetch]);
 
   const togglePowerShell = async (enabled: boolean) => {
     setShellSaving(true);
     setShellError(null);
     try {
-      const response = await fetch("/api/tools/settings", {
+      const response = await piWebFetch("/api/tools/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
@@ -92,7 +94,7 @@ function GeneralSettings({ sessionId, onSessionReloaded }: Pick<Props, "sessionI
       if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
       setShellSettings(data);
       if (sessionId) {
-        await sendAgentCommand(sessionId, { type: "reload" });
+        await sendAgentCommand(piWebFetch, sessionId, { type: "reload" });
         onSessionReloaded();
       }
     } catch (cause) {

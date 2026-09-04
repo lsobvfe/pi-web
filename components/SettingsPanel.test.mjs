@@ -59,6 +59,15 @@ test("offers direct light, dark, and system theme selection", () => {
   assert.match(themeSource, /const setThemePreference = useCallback/);
 });
 
+test("routes general settings requests through the embedded Pi Web host", () => {
+  assert.match(panelSource, /usePiWebClient/);
+  assert.match(panelSource, /const \{ request: piWebFetch \} = usePiWebClient\(\)/);
+  assert.match(panelSource, /piWebFetch\("\/api\/tools\/settings"\)/);
+  assert.match(panelSource, /piWebFetch\("\/api\/tools\/settings", \{/);
+  assert.match(panelSource, /sendAgentCommand\(piWebFetch, sessionId, \{ type: "reload" \}\)/);
+  assert.doesNotMatch(panelSource, /(?<!piWeb)fetch\("\/api\/tools\/settings"/);
+});
+
 test("keeps General free of divider rows", () => {
   assert.match(panelSource, /className="settings-dialog-header"/);
   assert.match(cssSource, /\.settings-dialog-header \{[\s\S]*?display: flex[\s\S]*?align-items: center[\s\S]*?min-height: 50px/);
